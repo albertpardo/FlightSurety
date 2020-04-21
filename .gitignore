@@ -64,3 +64,8 @@ typings/
 .env
 
 ~$*.pptx
+
+# albert 
+problemasProyecto.md
+.secret
+.gitignore
