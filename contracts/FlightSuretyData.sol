@@ -22,14 +22,16 @@ contract FlightSuretyData {
     mapping (address => Airlines) airlines;
     mapping (address => uint256) airlinesToRegister;     //Airlines list with cumulative votes waiting to be register
 
-    uint256 private balance;                            // Contract balance for pay Surety to passengers
-    uint256 constant airlineFee = 10 ether;             // Fee to be apported by an Airline to be Operational
+    uint256 private balance;                                     // Contract balance for pay Surety to passengers
+    uint256 private constant AIRLINE_FEE = 10 ether;             // Fee to be apported by an Airline to be Operational
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
 
+    event AirlineRegistered(address airline);
 
+    event AirlineFunded(address airline);
 
     /********************************************************************************************/
     /*                                       Constructor                                        */
@@ -83,7 +85,7 @@ contract FlightSuretyData {
     * @dev Modifier that requires the "msg.values" is 10 ethers
     */
     modifier requireFeesToBeOperational(uint256 value){
-        require (value == airlineFee, "Don't valid fee apported by Airline");
+        require (value == AIRLINE_FEE, "Don't valid fee apported by Airline");
         _;
     }
 
@@ -120,6 +122,10 @@ contract FlightSuretyData {
         operationalContract = mode;
     }
 
+    function getBalance() public view returns(uint256) {
+        return balance;
+    }
+
     /**
     * @dev Get consensus Status
     *
@@ -129,12 +135,15 @@ contract FlightSuretyData {
     */
     function isConsensus(address account) external returns(bool){
         uint256 M = 1;
+        uint8 MAX_AIRLINES_WITHOUT_NEED_CONSENSUS = 4;
+        uint8 CONSENSUS_PERCENTAGE = 50;   // Value in %
+
         //verify consensous for moren than 4 regitred airlines
         airlinesToRegister[account] = airlinesToRegister[account].add(1);
         // Update M
-        if (keyAirlinesRegistered.length > 4) {
-            M = keyAirlinesRegistered.length.div(2);
-            if (M.mul(2) < keyAirlinesRegistered.length) M = M.add(1);
+        if (keyAirlinesRegistered.length > MAX_AIRLINES_WITHOUT_NEED_CONSENSUS) {
+            M = keyAirlinesRegistered.length.mul(CONSENSUS_PERCENTAGE).div(100);     // this operation roun down
+            if (M.mul(100).div(CONSENSUS_PERCENTAGE) < keyAirlinesRegistered.length) M = M.add(1);  //Compesation for round down
         }
         // look for consensus status
         if (airlinesToRegister[account] >= M ) {
@@ -159,8 +168,23 @@ contract FlightSuretyData {
     {
         airlines[account] = Airlines({ isRegistered: true, isOperational: isOperational});
         keyAirlinesRegistered.push(account);       //To know the account registered
+        emit AirlineRegistered(account);
     }
 
+
+   /**
+    * @dev airline pay to be operational
+    *
+    */
+
+   function _fundToBeOperational(address airlineAccount, uint256 value) external
+                                   payable
+                                   requireIsOperationalContract   // Verify if this contract is ON
+   {
+        balance = balance.add(value);
+        airlines[airlineAccount].isOperational = true;
+        emit AirlineFunded(airlineAccount);
+   }
 
    /**
     * @dev Buy insurance for a flight
@@ -189,8 +213,7 @@ contract FlightSuretyData {
     *
     */
     function fund(address account, uint256 value) public payable requireFeesToBeOperational(value) {
-        balance = balance.add(value);
-        airlines[account].isOperational = true;
+        
     }
 
     function getFlightKey( address airline,

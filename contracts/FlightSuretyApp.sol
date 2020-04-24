@@ -49,19 +49,11 @@ contract FlightSuretyApp {
     *      This is used on all state changing functions to pause the contract in
     *      the event there is an issue that needs to be fixed
     */
-    modifier requireIsOperational()
+    modifier requireIsOperationalContract()
     {
          // Modify to call data contract's status
-        require(true, "Contract is currently not operational");
+        require(flightSuretyData.isOperationalContract(), "Contract is currently not operational");
         _;  // All modifiers require an "_" which indicates where the function body will be added
-    }
-
-        /**
-    * @dev Modifier that requires the "msg.sender" is Airline registered
-    */
-    modifier requireAirlineRegistered() {
-        require (flightSuretyData.isRegisteredAirline(msg.sender), "Airline no Registered");
-        _;
     }
 
     /**
@@ -73,18 +65,43 @@ contract FlightSuretyApp {
         _;
     }
 
-    /**
-    * @dev Modifier that requires consensus
-    */
-    modifier requireConsensus(address account) {
-        require (flightSuretyData.isConsensus(account), "No consensus");
-        _;
-    }
 
     modifier requiredNoZeroAddress(address acount) {
         require(acount != address(0), "Address '0' is not valid.");
         _;
     }
+
+    /**
+    * @dev Modifier that requires the "msg.sender" is Airline registered
+    */
+    modifier requireAirlineRegistered() {
+        require(flightSuretyData.isRegisteredAirline(msg.sender), "Airline no Registered");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires the "msg.sender" is Operatinal Airline
+    */
+
+    modifier requireAirlineOperational(){
+        require(flightSuretyData.isOperationalAirline(msg.sender), "Airline no Operational");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires consensus
+    */
+    modifier requireConsensus(address account) {
+        require(flightSuretyData.isConsensus(account), "No consensus");
+        _;
+    }
+
+    /********************************************************************************************/
+    /*                                       EVENT DEFINITIONS                                  */
+    /********************************************************************************************/
+
+   
+
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -118,6 +135,7 @@ contract FlightSuretyApp {
     *
     */
     function registerAirline(address airline) external
+                                              requireAirlineOperational
                                               requiredNoZeroAddress(airline)
                                               requireConsensus(airline)
     {
@@ -135,7 +153,7 @@ contract FlightSuretyApp {
                                      requiredNoZeroAddress(msg.sender)
                                      requireAirlineRegistered
    {
-        flightSuretyData.fund(msg.sender, msg.value);
+       flightSuretyData._fundToBeOperational(msg.sender, msg.value);
    }
 
    /**
@@ -353,10 +371,13 @@ contract FlightSuretyApp {
 }
 
 // Interface to FlightSuretyData.sol
+
 contract FlightSuretyData{
-    function _registerAirline(address account, bool isOperational) external;
+
     function isConsensus(address account) external returns(bool);
     function isOperationalContract() public view returns(bool);
     function isRegisteredAirline(address account) public view returns(bool);
-    function fund(address account, uint256 value) public payable;
+    function isOperationalAirline(address account) public view returns(bool);
+    function _registerAirline(address account, bool isOperational) external;
+    function _fundToBeOperational(address airlineAccount, uint256 value) external payable;
 }
